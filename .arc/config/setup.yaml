@@ -1,0 +1,4 @@
+commands:
+  test: python3 -m unittest discover -s . -p 'test_*.py'
+package_install_commands:
+  pip: pip install {requirement}

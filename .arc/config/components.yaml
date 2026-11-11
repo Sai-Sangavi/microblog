@@ -1,0 +1,19 @@
+version: 1
+components:
+  comp_proj_python_chore_002_define_architecture:
+    name: PROJ Python Chore 002 Define Architecture
+    kind: api_service
+    directory: .
+  comp_task_worker:
+    name: Task Worker
+    kind: worker
+    directory: .
+  comp_relational_database:
+    name: Relational Database
+    kind: infrastructure
+  comp_job_queue:
+    name: Job Queue
+    kind: infrastructure
+  comp_search_index:
+    name: Search Index
+    kind: infrastructure

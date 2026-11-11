@@ -4,16 +4,42 @@ components:
     name: PROJ Python Chore 002 Define Architecture
     kind: api_service
     directory: .
+    stack:
+      choices:
+        database: PostgreSQL
+        language: Python
+        framework: Flask
+        package_manager: pip
+        testing_tool_unit: unittest
+      notes: PostgreSQL in production, SQLite for local development only; unit tests
+        read from tests.py (unittest)
   comp_task_worker:
     name: Task Worker
     kind: worker
     directory: .
+    stack:
+      choices:
+        database: PostgreSQL
+        language: Python
+        framework: Flask
+        package_manager: pip
+        testing_tool_unit: unittest
+      notes: same codebase as the web app; shares the PostgreSQL database; no UI
   comp_relational_database:
     name: Relational Database
     kind: infrastructure
+    stack:
+      choices:
+        managed_service: PostgreSQL (managed)
   comp_job_queue:
     name: Job Queue
     kind: infrastructure
+    stack:
+      choices:
+        managed_service: Redis (managed), consumed via RQ
   comp_search_index:
     name: Search Index
     kind: infrastructure
+    stack:
+      choices:
+        managed_service: Elasticsearch (managed)

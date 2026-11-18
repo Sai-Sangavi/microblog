@@ -1,0 +1,8 @@
+<li class="comment">
+  <div class="comment-head">
+    <span class="avatar-sm avatar" aria-hidden="true">{{ comment.author.username[:2]|upper }}</span>
+    <strong>{{ comment.author.username }}</strong>
+    <span class="text-muted text-sm">{{ moment(comment.timestamp).fromNow() }}</span>
+  </div>
+  <p>{{ comment.body }}</p>
+</li>

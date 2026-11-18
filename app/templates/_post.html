@@ -11,10 +11,15 @@
                         {{ post.author.username }}
                     </a>
                 {% endset %}
+                {% set when_link %}
+                    <a href="{{ url_for('main.post', id=post.id) }}">{{ moment(post.timestamp).fromNow() }}</a>
+                {% endset %}
                 {{ _('%(username)s said %(when)s',
-                    username=user_link, when=moment(post.timestamp).fromNow()) }}
+                    username=user_link, when=when_link) }}
                 <br>
                 <span id="post{{ post.id }}">{{ post.body }}</span>
+                <br>
+                <a href="{{ url_for('main.post', id=post.id) }}#comments">{{ _('Comments') }}</a>
                 {% if post.language and post.language != g.locale %}
                 <br><br>
                 <span id="translation{{ post.id }}">

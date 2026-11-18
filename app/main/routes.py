@@ -12,7 +12,9 @@ from app.main.forms import (
     SearchForm,
     MessageForm,
     CommentForm,
+    NewPostForm,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from app.models import User, Post, Message, Notification, Comment
 from app.translate import translate
 from app.main import bp
@@ -27,16 +29,48 @@ def before_request():
     g.locale = str(get_locale())
 
 
+def _detect_language(text):
+    try:
+        return detect(text)
+    except LangDetectException:
+        return ""
+
+
+@bp.route("/new_post", methods=["GET", "POST"])
+@login_required
+def new_post():
+    form = NewPostForm()
+    publish_error = False
+    if form.validate_on_submit():
+        try:
+            post = Post(
+                body=form.body.data.strip(),
+                author=current_user,
+                language=_detect_language(form.body.data),
+            )
+            db.session.add(post)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            publish_error = True
+        else:
+            flash(_("Posted"), "toast")
+            return redirect(url_for("main.index"))
+    return render_template(
+        "new_post.html",
+        title=_("New post"),
+        form=form,
+        publish_error=publish_error,
+    )
+
+
 @bp.route("/", methods=["GET", "POST"])
 @bp.route("/index", methods=["GET", "POST"])
 @login_required
 def index():
     form = PostForm()
     if form.validate_on_submit():
-        try:
-            language = detect(form.post.data)
-        except LangDetectException:
-            language = ""
+        language = _detect_language(form.post.data)
         post = Post(body=form.post.data, author=current_user, language=language)
         db.session.add(post)
         db.session.commit()

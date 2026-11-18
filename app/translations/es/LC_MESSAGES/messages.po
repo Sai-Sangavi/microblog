@@ -114,6 +114,50 @@ msgstr "Mensaje"
 msgid "Your post is now live!"
 msgstr "¡Tu artículo ha sido publicado!"
 
+#: app/templates/new_post.html
+msgid "New post"
+msgstr "Nueva publicación"
+
+#: app/main/routes.py
+msgid "Posted"
+msgstr "Publicado"
+
+#: app/main/forms.py
+msgid "Post text"
+msgstr "Texto de la publicación"
+
+#: app/main/forms.py
+msgid "Publish"
+msgstr "Publicar"
+
+#: app/main/forms.py
+msgid "Write something before you publish."
+msgstr "Escribe algo antes de publicar."
+
+#: app/main/forms.py
+msgid "Shorten your post to 140 characters to publish."
+msgstr "Acorta tu publicación a 140 caracteres para publicarla."
+
+#: app/templates/new_post.html
+msgid "What is on your mind?"
+msgstr "¿Qué tienes en mente?"
+
+#: app/templates/new_post.html
+msgid "Publish turns on once you have written something."
+msgstr "Publicar se activa cuando hayas escrito algo."
+
+#: app/templates/new_post.html
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: app/templates/new_post.html
+msgid ""
+"Your post didn't publish. Check your connection and press Publish to try "
+"again. Your text is still here."
+msgstr ""
+"Tu publicación no se publicó. Revisa tu conexión y pulsa Publicar para "
+"intentarlo de nuevo. Tu texto sigue aquí."
+
 #: app/main/routes.py:94
 msgid "Your changes have been saved."
 msgstr "Tus cambios han sido salvados."

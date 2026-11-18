@@ -37,6 +37,19 @@ class PostForm(FlaskForm):
     submit = SubmitField(_l("Submit"))
 
 
+class NewPostForm(FlaskForm):
+    body = TextAreaField(
+        _l("Post text"),
+        validators=[
+            DataRequired(message=_l("Write something before you publish.")),
+            Length(
+                max=140, message=_l("Shorten your post to 140 characters to publish.")
+            ),
+        ],
+    )
+    submit = SubmitField(_l("Publish"))
+
+
 class SearchForm(FlaskForm):
     q = StringField(_l("Search"), validators=[DataRequired()])
 

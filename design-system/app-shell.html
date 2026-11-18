@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Microblog — app shell</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="prototype-utils.css">
+  <style>
+    /* Shell-only rules. The 48rem breakpoint is a literal because media queries cannot read var(). */
+    .shell { display: flex; flex-direction: column; min-height: 100vh; }
+    .shell-header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-bg); border-bottom: var(--border-width) solid var(--color-border);
+    }
+    .shell-brand, .shell-footer nav a { display: inline-flex; align-items: center; min-height: var(--size-control, 2.75rem); min-width: var(--size-control, 2.75rem); }
+    .shell-toggle { min-height: var(--size-control, 2.75rem); min-width: var(--size-control, 2.75rem); }
+    .shell-brand { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); color: var(--color-fg); text-decoration: none; }
+    .shell-nav { display: none; flex-direction: column; gap: var(--space-2); width: 100%; min-width: 0; }
+    .shell-nav.is-open { display: flex; }
+    .shell-links { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+    .shell-links a {
+      display: flex; align-items: center; gap: var(--space-2); min-height: var(--size-control); padding: 0 var(--space-2);
+      color: var(--color-fg-muted); font-weight: var(--font-weight-medium); text-decoration: none; border-radius: var(--radius-md);
+    }
+    .shell-links a:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
+    .shell-links a[aria-current="page"] { color: var(--color-primary); background: var(--color-info-bg); }
+    .shell-search { min-width: 0; }
+    .shell-main { flex: 1; width: 100%; max-width: var(--size-container); margin-inline: auto; padding: var(--space-4) var(--space-3); min-width: 0; }
+    .shell-footer {
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2);
+      padding: var(--space-3); border-top: var(--border-width) solid var(--color-border);
+      color: var(--color-fg-muted); font-size: var(--font-size-sm);
+    }
+    .shell-footer nav { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+    @media (min-width: 48rem) {
+      .shell-toggle { display: none; }
+      .shell-nav, .shell-nav.is-open { display: flex; flex-direction: row; align-items: center; justify-content: space-between; flex: 1; width: auto; gap: var(--space-3); }
+      .shell-links { flex-direction: row; }
+      .shell-search { width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell" data-arc-shell>
+    <header class="shell-header" data-arc-shell-part="header">
+      <a class="shell-brand" href="#">Microblog</a>
+      <button class="btn btn-secondary shell-toggle" type="button" data-toggle="main-nav" aria-controls="main-nav" aria-expanded="false">&#9776; Menu</button>
+      <nav class="shell-nav" id="main-nav" data-arc-shell-part="nav" aria-label="Main">
+        <ul class="shell-links">
+          <li><a href="#" data-nav-key="home">Home</a></li>
+          <li><a href="#" data-nav-key="explore">Explore</a></li>
+          <li><a href="#" data-nav-key="messages">Messages <span class="badge badge-danger">3</span></a></li>
+          <li><a href="#" data-nav-key="profile">Profile</a></li>
+          <li><a href="#" data-nav-key="logout">Log out</a></li>
+        </ul>
+        <form class="shell-search" role="search" action="#" method="get">
+          <input class="input" type="search" name="q" placeholder="Search posts" aria-label="Search posts">
+        </form>
+      </nav>
+    </header>
+
+    <main class="shell-main">
+      <div data-arc-content></div>
+    </main>
+
+    <footer class="shell-footer" data-arc-shell-part="footer">
+      <span>Microblog</span>
+      <nav aria-label="Footer">
+        <a href="#">About</a>
+        <a href="#">Privacy</a>
+        <a href="#">Help</a>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>

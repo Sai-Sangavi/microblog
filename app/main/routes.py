@@ -1,5 +1,16 @@
 from datetime import datetime, timezone
-from flask import render_template, flash, redirect, url_for, request, g, current_app
+from flask import (
+    render_template,
+    flash,
+    redirect,
+    url_for,
+    request,
+    g,
+    current_app,
+    jsonify,
+    abort,
+    send_from_directory,
+)
 from flask_login import current_user, login_required
 from flask_babel import _, get_locale
 import sqlalchemy as sa
@@ -17,7 +28,7 @@ from app.main.forms import (
 from sqlalchemy.exc import SQLAlchemyError
 from app.models import User, Post, Message, Notification, Comment
 from app.translate import translate
-from app.main import bp
+from app.main import bp, videos
 
 
 @bp.before_app_request
@@ -36,17 +47,77 @@ def _detect_language(text):
         return ""
 
 
+def _video_limit_text():
+    size = current_app.config["VIDEO_MAX_BYTES"]
+    mb = 1024 * 1024
+    amount = f"{size // mb} MB" if size >= mb else f"{max(size // 1024, 1)} KB"
+    return _(
+        "%(formats)s, up to %(size)s. One video per post.",
+        formats=_("MP4 or MOV"),
+        size=amount,
+    )
+
+
+@bp.app_errorhandler(413)
+def request_too_large(error):
+    if request.path == url_for("main.upload_video"):
+        return jsonify(error=_("That video is too large. Choose a smaller file.")), 413
+    return error
+
+
+@bp.route("/new_post/video", methods=["POST"])
+@login_required
+def upload_video():
+    form = EmptyForm()
+    if not form.validate_on_submit():
+        return jsonify(error=_("Reload the page and try again.")), 400
+    file = request.files.get("video")
+    if file is None:
+        return jsonify(error=_("Choose a video file.")), 400
+    file.stream.seek(0, 2)
+    size = file.stream.tell()
+    file.stream.seek(0)
+    if size > current_app.config["VIDEO_MAX_BYTES"]:
+        return jsonify(error=_("That video is too large. Choose a smaller file.")), 413
+    token = videos.save_pending(current_user.id, file)
+    if token is None:
+        return jsonify(error=_("Choose an MP4 or MOV video.")), 400
+    return jsonify(token=token)
+
+
+@bp.route("/new_post/video/<token>", methods=["DELETE"])
+@login_required
+def discard_video(token):
+    videos.delete_pending(current_user.id, token)
+    return "", 204
+
+
+@bp.route("/media/video/<filename>")
+@login_required
+def post_video(filename):
+    if not videos.is_valid_filename(filename):
+        abort(404)
+    return send_from_directory(videos.final_dir(), filename, conditional=True)
+
+
 @bp.route("/new_post", methods=["GET", "POST"])
 @login_required
 def new_post():
     form = NewPostForm()
     publish_error = False
+    if request.method == "POST" and not videos.has_pending(
+        current_user.id, form.video_token.data
+    ):
+        form.video_token.data = ""
     if form.validate_on_submit():
         try:
+            body = (form.body.data or "").strip()
+            filename = videos.promote(current_user.id, form.video_token.data)
             post = Post(
-                body=form.body.data.strip(),
+                body=body,
                 author=current_user,
-                language=_detect_language(form.body.data),
+                language=_detect_language(body) if body else "",
+                video_filename=filename,
             )
             db.session.add(post)
             db.session.commit()
@@ -61,6 +132,7 @@ def new_post():
         title=_("New post"),
         form=form,
         publish_error=publish_error,
+        video_limit=_video_limit_text(),
     )
 
 

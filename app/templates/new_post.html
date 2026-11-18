@@ -21,23 +21,146 @@
                    placeholder=_('What is on your mind?'),
                    **{"aria-describedby": "publish-error" if publish_error else "post-hint",
                       "aria-invalid": "true" if form.body.errors else "false"}) }}
-      <p class="field-hint" id="post-hint">{{ _('Publish turns on once you have written something.') }}</p>
+      <p class="field-hint" id="post-hint">{{ _('Publish turns on once you have written something or added a video.') }}</p>
       {% for error in form.body.errors %}
       <p class="field-error">{{ error }}</p>
       {% endfor %}
     </div>
+    <div class="card stack-sm" id="video-card">
+      <span class="text-bold" id="video-label">{{ _('Video (optional)') }}</span>
+      <div class="dropzone" id="dropzone" role="group" aria-labelledby="video-label"{% if has_video %} hidden{% endif %}>
+        <button type="button" class="btn btn-secondary" id="choose-video">{{ _('Choose video file') }}</button>
+        <span class="text-muted text-sm">{{ video_limit }}</span>
+      </div>
+      <input type="file" id="video-file" hidden accept="video/mp4,video/quicktime,.mp4,.mov">
+      <div id="upload-panel" class="stack-sm"{% if not has_video %} hidden{% endif %}>
+        <div class="file-row">
+          <span class="thumb" aria-hidden="true">&#9654;</span>
+          <span class="file-name" id="file-name">{% if has_video %}{{ _('Video') }}{% endif %}</span>
+          <span class="text-muted" id="upload-pct" role="status"{% if has_video %} hidden{% endif %}></span>
+          <span class="text-success text-bold" id="upload-done" role="status"{% if not has_video %} hidden{% endif %}>{{ _('Uploaded') }}</span>
+        </div>
+        <progress class="progress-bar" id="upload-progress" max="100" value="{{ 100 if has_video else 0 }}" aria-label="{{ _('Video upload progress') }}"></progress>
+        <span class="text-muted text-sm" id="upload-keep-open" hidden>{{ _('Keep this page open until the upload finishes.') }}</span>
+        <p class="field-error" id="upload-error" role="alert" hidden></p>
+      </div>
+    </div>
     <div class="form-actions">
       <a class="btn btn-secondary" href="{{ url_for('main.index') }}">{{ _('Cancel') }}</a>
-      <button class="btn btn-primary" type="submit" id="publish"{% if not (form.body.data or '').strip() %} disabled{% endif %}>{{ _('Publish') }}</button>
+      <button class="btn btn-secondary" type="button" id="cancel-upload" hidden>{{ _('Cancel upload') }}</button>
+      <button class="btn btn-primary" type="submit" id="publish" aria-describedby="publish-wait"{% if not (form.body.data or '').strip() and not has_video %} disabled{% endif %}>{{ _('Publish') }}</button>
     </div>
+    <span class="field-hint" id="publish-wait" hidden>{{ _('Publish turns on when the video has finished uploading.') }}</span>
   </form>
 </div>
 <script>
   (function () {
     const box = document.getElementById('body');
     const publish = document.getElementById('publish');
-    function sync() { publish.disabled = box.value.trim().length === 0; }
+    const tokenInput = document.getElementById('video_token');
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('video-file');
+    const panel = document.getElementById('upload-panel');
+    const pct = document.getElementById('upload-pct');
+    const done = document.getElementById('upload-done');
+    const bar = document.getElementById('upload-progress');
+    const fileName = document.getElementById('file-name');
+    const keepOpen = document.getElementById('upload-keep-open');
+    const wait = document.getElementById('publish-wait');
+    const cancelBtn = document.getElementById('cancel-upload');
+    const errorBox = document.getElementById('upload-error');
+    const label = document.querySelector('label[for="body"]');
+    const baseLabel = label.textContent;
+    const csrf = {{ form.csrf_token._value()|tojson }};
+    let uploading = false;
+    let uploaded = tokenInput.value !== '';
+    let xhr = null;
+
+    function sync() {
+      const hasText = box.value.trim().length > 0;
+      publish.disabled = uploading || (!hasText && !uploaded);
+      cancelBtn.hidden = !uploading;
+      wait.hidden = !uploading;
+      keepOpen.hidden = !uploading;
+      label.textContent = uploaded ? {{ _('Post text (optional with a video)')|tojson }} : baseLabel;
+    }
     box.addEventListener('input', sync);
+
+    function size(bytes) {
+      return bytes >= 1048576 ? Math.round(bytes / 1048576) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    }
+
+    function reset() {
+      uploading = false;
+      uploaded = false;
+      xhr = null;
+      tokenInput.value = '';
+      fileInput.value = '';
+      panel.hidden = true;
+      dropzone.hidden = false;
+      sync();
+    }
+
+    function cancelUpload() {
+      const token = tokenInput.value;
+      if (xhr) { xhr.abort(); }
+      if (token) {
+        fetch({{ url_for('main.upload_video')|tojson }} + '/' + token, {
+          method: 'DELETE', headers: {'X-CSRFToken': csrf}
+        });
+      }
+      reset();
+    }
+    cancelBtn.addEventListener('click', cancelUpload);
+
+    document.getElementById('choose-video').addEventListener('click', function () { fileInput.click(); });
+
+    fileInput.addEventListener('change', function () {
+      const file = fileInput.files[0];
+      if (!file) { return; }
+      errorBox.hidden = true;
+      const data = new FormData();
+      data.append('video', file);
+      xhr = new XMLHttpRequest();
+      const upload = xhr.upload;
+      xhr.open('POST', {{ url_for('main.upload_video')|tojson }});
+      xhr.setRequestHeader('X-CSRFToken', csrf);
+      xhr.responseType = 'json';
+      uploading = true;
+      uploaded = false;
+      dropzone.hidden = true;
+      panel.hidden = false;
+      done.hidden = true;
+      pct.hidden = false;
+      fileName.textContent = file.name + ' (' + size(file.size) + ')';
+      bar.value = 0;
+      pct.textContent = {{ _('Uploading')|tojson }} + ' 0%';
+      upload.onprogress = function (e) {
+        if (!e.lengthComputable) { return; }
+        const value = Math.round(e.loaded / e.total * 100);
+        bar.value = value;
+        pct.textContent = {{ _('Uploading')|tojson }} + ' ' + value + '%';
+      };
+      xhr.onload = function () {
+        const body = xhr.response || {};
+        if (xhr.status === 200 && body.token) {
+          tokenInput.value = body.token;
+          uploading = false;
+          uploaded = true;
+          bar.value = 100;
+          pct.hidden = true;
+          done.hidden = false;
+          sync();
+        } else {
+          errorBox.textContent = body.error || '';
+          errorBox.hidden = !body.error;
+          reset();
+        }
+      };
+      sync();
+      xhr.send(data);
+    });
+
     sync();
   })();
 </script>

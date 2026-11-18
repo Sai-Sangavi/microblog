@@ -1,7 +1,7 @@
 from flask import request
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, TextAreaField
-from wtforms.validators import ValidationError, DataRequired, Length
+from wtforms import HiddenField, StringField, SubmitField, TextAreaField
+from wtforms.validators import ValidationError, DataRequired, Length, Optional
 import sqlalchemy as sa
 from flask_babel import _, lazy_gettext as _l
 from app import db
@@ -41,13 +41,23 @@ class NewPostForm(FlaskForm):
     body = TextAreaField(
         _l("Post text"),
         validators=[
-            DataRequired(message=_l("Write something before you publish.")),
+            Optional(),
             Length(
                 max=140, message=_l("Shorten your post to 140 characters to publish.")
             ),
         ],
     )
+    video_token = HiddenField()
     submit = SubmitField(_l("Publish"))
+
+    def validate(self, extra_validators=None):
+        ok = super().validate(extra_validators)
+        if ok and not (self.body.data or "").strip() and not self.video_token.data:
+            self.body.errors = list(self.body.errors) + [
+                _("Write something before you publish.")
+            ]
+            return False
+        return ok
 
 
 class SearchForm(FlaskForm):

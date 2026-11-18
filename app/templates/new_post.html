@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='new_post.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="stack-lg">
+  <div class="page-head">
+    <h1>{{ _('New post') }}</h1>
+  </div>
+  <form method="post" novalidate class="stack-lg">
+    {{ form.hidden_tag() }}
+    {% if publish_error %}
+    <div class="alert alert-danger" role="alert" id="publish-error">{{ _("Your post didn't publish. Check your connection and press Publish to try again. Your text is still here.") }}</div>
+    {% endif %}
+    <div class="field">
+      {{ form.body.label }}
+      {{ form.body(class="textarea" + (" is-invalid" if form.body.errors else ""),
+                   rows=5,
+                   placeholder=_('What is on your mind?'),
+                   **{"aria-describedby": "publish-error" if publish_error else "post-hint",
+                      "aria-invalid": "true" if form.body.errors else "false"}) }}
+      <p class="field-hint" id="post-hint">{{ _('Publish turns on once you have written something.') }}</p>
+      {% for error in form.body.errors %}
+      <p class="field-error">{{ error }}</p>
+      {% endfor %}
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-secondary" href="{{ url_for('main.index') }}">{{ _('Cancel') }}</a>
+      <button class="btn btn-primary" type="submit" id="publish"{% if not (form.body.data or '').strip() %} disabled{% endif %}>{{ _('Publish') }}</button>
+    </div>
+  </form>
+</div>
+<script>
+  (function () {
+    const box = document.getElementById('body');
+    const publish = document.getElementById('publish');
+    function sync() { publish.disabled = box.value.trim().length === 0; }
+    box.addEventListener('input', sync);
+    sync();
+  })();
+</script>
+{% endblock %}

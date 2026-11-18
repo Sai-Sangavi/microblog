@@ -119,7 +119,7 @@ def set_override(project_id, variable_id):
     project = get_owned_project(project_id)
     variable = db.session.get(Variable, variable_id)
     if variable is None or variable.project_id != project.id:
-        abort(404)
+        return abort(404)
     form = OverrideForm()
     form.environment_id.choices = [
         (e.id, e.name) for e in db.session.scalars(project.environments.select())
@@ -128,7 +128,7 @@ def set_override(project_id, variable_id):
         abort(400)
     env = db.session.get(Environment, form.environment_id.data)
     if env is None or env.project_id != project.id:
-        abort(404)
+        return abort(404)
     override = db.session.scalar(
         variable.overrides.select().where(VariableOverride.environment_id == env.id)
     )

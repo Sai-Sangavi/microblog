@@ -110,6 +110,7 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
     token_expiration: so.Mapped[Optional[datetime]]
 
     posts: so.WriteOnlyMapped["Post"] = so.relationship(back_populates="author")
+    comments: so.WriteOnlyMapped["Comment"] = so.relationship(back_populates="author")
     following: so.WriteOnlyMapped["User"] = so.relationship(
         secondary=followers,
         primaryjoin=(followers.c.follower_id == id),
@@ -306,9 +307,26 @@ class Post(SearchableMixin, db.Model):
     language: so.Mapped[Optional[str]] = so.mapped_column(sa.String(5))
 
     author: so.Mapped[User] = so.relationship(back_populates="posts")
+    comments: so.WriteOnlyMapped["Comment"] = so.relationship(back_populates="post")
 
     def __repr__(self):
         return "<Post {}>".format(self.body)
+
+
+class Comment(db.Model):
+    id: so.Mapped[int] = so.mapped_column(primary_key=True)
+    body: so.Mapped[str] = so.mapped_column(sa.String(1000))
+    timestamp: so.Mapped[datetime] = so.mapped_column(
+        index=True, default=lambda: datetime.now(timezone.utc)
+    )
+    post_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(Post.id), index=True)
+    user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(User.id), index=True)
+
+    post: so.Mapped[Post] = so.relationship(back_populates="comments")
+    author: so.Mapped[User] = so.relationship(back_populates="comments")
+
+    def __repr__(self):
+        return "<Comment {}>".format(self.body)
 
 
 class Message(db.Model):

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='comments.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="post-page stack-lg">
+  <article class="card">
+    <div class="cluster">
+      <span class="avatar" aria-hidden="true">{{ post.author.username[:2]|upper }}</span>
+      <a href="{{ url_for('main.user', username=post.author.username) }}"><strong>{{ post.author.username }}</strong></a>
+      <span class="text-muted text-sm">{{ moment(post.timestamp).fromNow() }}</span>
+    </div>
+    <p class="post-body">{{ post.body }}</p>
+  </article>
+
+  <section aria-label="{{ _('Comments') }}" class="stack-lg" id="comments">
+    <h2 class="text-lg">{{ _('Comments') }} ({{ comments|length }})</h2>
+    {% if current_user.is_authenticated %}
+    <form class="card stack" method="post" action="{{ url_for('main.post', id=post.id) }}#comments" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="field">
+        {{ form.body.label }}
+        {{ form.body(class_='textarea' + (' is-invalid' if form.body.errors else ''),
+                     placeholder=_('Write a comment…'),
+                     **({'aria-invalid': 'true'} if form.body.errors else {})) }}
+        {% for error in form.body.errors %}
+        <p class="field-error" role="alert">{{ error }}</p>
+        {% endfor %}
+      </div>
+      <div class="form-foot">
+        <span class="field-hint" id="comment-counter" aria-live="polite">0 / 1000</span>
+        {{ form.submit(class_='btn btn-primary') }}
+      </div>
+    </form>
+    <script>
+      (function () {
+        const box = document.getElementById('{{ form.body.id }}');
+        const counter = document.getElementById('comment-counter');
+        function update() { counter.textContent = box.value.length + ' / 1000'; }
+        box.addEventListener('input', update);
+        update();
+      })();
+    </script>
+    {% else %}
+    <div class="prompt">
+      <a href="{{ url_for('auth.login', next=request.path) }}">{{ _('Log in to comment') }}</a>
+    </div>
+    {% endif %}
+
+    {% if comments %}
+    <ol class="comment-list">
+      {% for comment in comments %}
+      {% include '_comment.html' %}
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="empty-state">
+      <p class="text-bold">{{ _('No comments yet') }}</p>
+      <p class="text-muted">{{ _('Be the first to say something about this post.') }}</p>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

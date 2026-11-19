@@ -26,17 +26,160 @@
       <p class="field-error">{{ error }}</p>
       {% endfor %}
     </div>
+    <div class="card stack-sm" id="video-card">
+      <span class="text-bold" id="video-label">{{ _('Video (optional)') }}</span>
+      <div class="dropzone" id="dropzone" role="group" aria-labelledby="video-label"{% if video_ready %} hidden{% endif %}>
+        <button type="button" class="btn btn-secondary" id="choose-video">{{ _('Choose video file') }}</button>
+        <input type="file" id="video-file" hidden accept="video/mp4,video/quicktime,.mp4,.mov">
+        <span class="text-muted text-sm">{{ _('MP4 or MOV, up to %(size)s. One video per post.', size=video_limit) }}</span>
+      </div>
+      <div class="stack-sm" id="video-attached"{% if not video_ready %} hidden{% endif %}>
+        <div class="file-row">
+          <span class="thumb" aria-hidden="true"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M10 9l5 3-5 3z"></path></svg></span>
+          <span class="file-name" id="video-name">{% if video_ready %}{{ _('Video attached') }}{% endif %}</span>
+          <span class="text-muted" id="upload-pct" role="status"{% if video_ready %} hidden{% endif %}></span>
+          <span class="text-success text-bold" id="upload-done"{% if not video_ready %} hidden{% endif %}>{{ _('Uploaded') }}</span>
+        </div>
+        <progress class="progress-bar" id="upload-progress" max="100" value="{{ 100 if video_ready else 0 }}" aria-label="{{ _('Video upload progress') }}"></progress>
+        <span class="text-muted text-sm" id="upload-keep-open" hidden>{{ _('Keep this page open until the upload finishes.') }}</span>
+      </div>
+      <p class="field-error" id="video-error" role="alert" hidden></p>
+    </div>
     <div class="form-actions">
       <a class="btn btn-secondary" href="{{ url_for('main.index') }}">{{ _('Cancel') }}</a>
-      <button class="btn btn-primary" type="submit" id="publish"{% if not (form.body.data or '').strip() %} disabled{% endif %}>{{ _('Publish') }}</button>
+      <button class="btn btn-secondary" type="button" id="cancel-upload" hidden>{{ _('Cancel upload') }}</button>
+      <button class="btn btn-primary" type="submit" id="publish"{% if not ((form.body.data or '').strip() or video_ready) %} disabled{% endif %}>{{ _('Publish') }}</button>
     </div>
+    <span class="field-hint" id="publish-wait" hidden>{{ _('Publish turns on when the video has finished uploading.') }}</span>
   </form>
 </div>
 <script>
   (function () {
     const box = document.getElementById('body');
     const publish = document.getElementById('publish');
-    function sync() { publish.disabled = box.value.trim().length === 0; }
+    const tokenInput = document.getElementById('video_token');
+    const fileInput = document.getElementById('video-file');
+    const dropzone = document.getElementById('dropzone');
+    const attached = document.getElementById('video-attached');
+    const pct = document.getElementById('upload-pct');
+    const done = document.getElementById('upload-done');
+    const bar = document.getElementById('upload-progress');
+    const keepOpen = document.getElementById('upload-keep-open');
+    const wait = document.getElementById('publish-wait');
+    const cancelBtn = document.getElementById('cancel-upload');
+    const errorBox = document.getElementById('video-error');
+    const label = document.querySelector('label[for="body"]');
+    const defaultLabel = label.textContent;
+    const csrf = document.querySelector('input[name="csrf_token"]');
+    const uploadUrl = {{ url_for('main.upload_video')|tojson }};
+    const maxBytes = {{ config.VIDEO_MAX_BYTES|tojson }};
+    const text = {
+      uploading: {{ _('Uploading')|tojson }},
+      optionalLabel: {{ _('Post text (optional with a video)')|tojson }},
+      tooLarge: {{ _('That video is too large. Choose a smaller one.')|tojson }},
+      failed: {{ _('The video could not be uploaded. Try again.')|tojson }}
+    };
+    let uploading = false;
+    let uploaded = tokenInput.value !== '';
+    let xhr = null;
+
+    function sync() {
+      const hasText = box.value.trim().length > 0;
+      publish.disabled = uploading || (!hasText && !uploaded);
+      if (uploading) { publish.setAttribute('aria-describedby', 'publish-wait'); }
+      else { publish.removeAttribute('aria-describedby'); }
+      wait.hidden = !uploading;
+      cancelBtn.hidden = !uploading;
+      keepOpen.hidden = !uploading;
+      label.textContent = uploaded ? text.optionalLabel : defaultLabel;
+    }
+
+    function csrfHeaders() {
+      return csrf ? { 'X-CSRFToken': csrf.value } : {};
+    }
+
+    function sizeLabel(bytes) {
+      return bytes >= 1048576 ? Math.round(bytes / 1048576) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    }
+
+    function showDefault() {
+      uploading = false;
+      uploaded = false;
+      tokenInput.value = '';
+      fileInput.value = '';
+      attached.hidden = true;
+      dropzone.hidden = false;
+      sync();
+    }
+
+    function startUpload(file) {
+      errorBox.hidden = true;
+      if (file.size > maxBytes) {
+        errorBox.textContent = text.tooLarge;
+        errorBox.hidden = false;
+        fileInput.value = '';
+        return;
+      }
+      uploading = true;
+      dropzone.hidden = true;
+      attached.hidden = false;
+      done.hidden = true;
+      pct.hidden = false;
+      pct.textContent = text.uploading + ' 0%';
+      bar.value = 0;
+      document.getElementById('video-name').textContent = file.name + ' (' + sizeLabel(file.size) + ')';
+      sync();
+      xhr = new XMLHttpRequest();
+      xhr.open('POST', uploadUrl);
+      Object.entries(csrfHeaders()).forEach(function (h) { xhr.setRequestHeader(h[0], h[1]); });
+      xhr.upload.onprogress = function (e) {
+        if (!e.lengthComputable) { return; }
+        const p = Math.round(e.loaded / e.total * 100);
+        bar.value = p;
+        pct.textContent = text.uploading + ' ' + p + '%';
+      };
+      xhr.onload = function () {
+        xhr = null;
+        let data = {};
+        try { data = JSON.parse(this.responseText); } catch (err) { data = {}; }
+        if (this.status === 200 && data.token) {
+          tokenInput.value = data.token;
+          uploading = false;
+          uploaded = true;
+          bar.value = 100;
+          pct.hidden = true;
+          done.hidden = false;
+          sync();
+        } else {
+          showDefault();
+          errorBox.textContent = this.status === 413 ? text.tooLarge : (data.error || text.failed);
+          errorBox.hidden = false;
+        }
+      };
+      xhr.onerror = function () {
+        xhr = null;
+        showDefault();
+        errorBox.textContent = text.failed;
+        errorBox.hidden = false;
+      };
+      const data = new FormData();
+      data.append('video', file);
+      xhr.send(data);
+    }
+
+    function cancelUpload() {
+      if (xhr) { xhr.abort(); xhr = null; }
+      const token = tokenInput.value;
+      if (token) {
+        fetch(uploadUrl + '/' + encodeURIComponent(token), { method: 'DELETE', headers: csrfHeaders() });
+      }
+      showDefault();
+      dropzone.hidden = false;
+    }
+
+    document.getElementById('choose-video').addEventListener('click', function () { fileInput.click(); });
+    fileInput.addEventListener('change', function () { if (fileInput.files.length) { startUpload(fileInput.files[0]); } });
+    cancelBtn.addEventListener('click', cancelUpload);
     box.addEventListener('input', sync);
     sync();
   })();

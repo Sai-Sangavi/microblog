@@ -20,6 +20,9 @@ server {
     access_log /var/log/microblog_access.log;
     error_log /var/log/microblog_error.log;
 
+    # allow video uploads (VIDEO_MAX_BYTES plus multipart overhead)
+    client_max_body_size 501m;
+
     location / {
         # forward application requests to the gunicorn server
         proxy_pass http://localhost:8000;

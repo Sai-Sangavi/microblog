@@ -1,10 +1,12 @@
 import os
 import re
+import time
 import uuid
 from flask import current_app
 
 ALLOWED_VIDEO_EXTENSIONS = (".mp4", ".mov")
 _TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+PENDING_MAX_AGE = 24 * 60 * 60  # seconds
 FINAL_NAME_RE = re.compile(r"^[0-9]+-[0-9a-f]{32}\.(mp4|mov)$")
 
 
@@ -34,9 +36,23 @@ def save_pending(user_id, file_storage):
     ext = os.path.splitext(file_storage.filename or "")[1].lower()
     if ext not in ALLOWED_VIDEO_EXTENSIONS:
         return None
+    _purge_pending(user_id)
     token = uuid.uuid4().hex
     file_storage.save(os.path.join(_dir("pending"), f"{int(user_id)}-{token}{ext}"))
     return token
+
+
+def _purge_pending(user_id):
+    """Keep at most one pending upload per user and expire stale ones."""
+    pending = _dir("pending")
+    cutoff = time.time() - PENDING_MAX_AGE
+    for name in os.listdir(pending):
+        path = os.path.join(pending, name)
+        try:
+            if name.startswith(f"{int(user_id)}-") or os.path.getmtime(path) < cutoff:
+                os.remove(path)
+        except OSError:
+            pass
 
 
 def delete_pending(user_id, token):
@@ -55,6 +71,13 @@ def promote(user_id, token):
     filename = os.path.basename(path)
     os.replace(path, os.path.join(final_dir(), filename))
     return filename
+
+
+def unpromote(filename):
+    """Move a promoted file back to pending (used when publishing fails)."""
+    os.replace(
+        os.path.join(final_dir(), filename), os.path.join(_dir("pending"), filename)
+    )
 
 
 def has_pending(user_id, token):

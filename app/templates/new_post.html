@@ -98,10 +98,6 @@
       return csrf ? { 'X-CSRFToken': csrf.value } : {};
     }
 
-    function sizeLabel(bytes) {
-      return bytes >= 1048576 ? Math.round(bytes / 1048576) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
-    }
-
     function showDefault() {
       uploading = false;
       uploaded = false;
@@ -127,7 +123,7 @@
       pct.hidden = false;
       pct.textContent = text.uploading + ' 0%';
       bar.value = 0;
-      document.getElementById('video-name').textContent = file.name + ' (' + sizeLabel(file.size) + ')';
+      document.getElementById('video-name').textContent = file.name;
       sync();
       xhr = new XMLHttpRequest();
       xhr.open('POST', uploadUrl);

@@ -23,6 +23,8 @@ class Config:
     ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL")
     REDIS_URL = os.environ.get("REDIS_URL") or "redis://"
     POSTS_PER_PAGE = 25
+    # Keep nginx client_max_body_size (deployment/nginx/microblog) in step
+    # with VIDEO_MAX_BYTES: it must be this value plus multipart overhead.
     VIDEO_MAX_BYTES = int(os.environ.get("VIDEO_MAX_BYTES") or 500 * 1024 * 1024)
     VIDEO_UPLOAD_DIR = os.environ.get("VIDEO_UPLOAD_DIR") or os.path.join(
         basedir, "uploads"

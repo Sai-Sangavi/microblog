@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from functools import wraps
 from flask import (
     render_template,
     flash,
@@ -55,27 +56,23 @@ def new_post():
     form = NewPostForm()
     publish_error = False
     token = (form.video_token.data or "").strip()
-    if token and not videos.has_pending(current_user.id, token):
+    token_invalid = bool(token) and not videos.has_pending(current_user.id, token)
+    if token_invalid:
         # A token that is not a finished upload can never be published.
         form.video_token.data = token = ""
-        if request.method == "POST":
-            form.body.errors = []
-            form.validate()
-            form.body.errors = list(form.body.errors) + [
-                _(
-                    "Your video isn't ready. Wait until it has finished uploading, then publish."
-                )
-            ]
-            return render_template(
-                "new_post.html",
-                title=_("New post"),
-                form=form,
-                publish_error=False,
-                video_ready=False,
-                video_limit=videos.format_size(current_app.config["VIDEO_MAX_BYTES"]),
+    submitted = False
+    if token_invalid and request.method == "POST":
+        form.validate()
+        form.body.errors = list(form.body.errors) + [
+            _(
+                "Your video isn't ready. Wait until it has finished uploading, then publish."
             )
-    if form.validate_on_submit():
+        ]
+    else:
+        submitted = form.validate_on_submit()
+    if submitted:
         body = (form.body.data or "").strip()
+        filename = None
         try:
             filename = videos.promote(current_user.id, token) if token else None
             post = Post(
@@ -87,7 +84,14 @@ def new_post():
             db.session.add(post)
             db.session.commit()
         except (SQLAlchemyError, OSError):
+            current_app.logger.exception("Publishing a post failed")
             db.session.rollback()
+            if filename:
+                # Put the video back so the member can retry with the same token.
+                try:
+                    videos.unpromote(filename)
+                except OSError:
+                    current_app.logger.exception("Could not restore video %s", filename)
             publish_error = True
         else:
             flash(_("Posted"), "toast")
@@ -102,22 +106,29 @@ def new_post():
     )
 
 
-def _check_csrf():
-    if current_app.config.get("WTF_CSRF_ENABLED", True):
-        validate_csrf(
-            request.headers.get("X-CSRFToken") or request.form.get("csrf_token")
-        )
+def csrf_protected_json(view):
+    """Reject the request with a JSON 400 when its CSRF token is invalid."""
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if current_app.config.get("WTF_CSRF_ENABLED", True):
+            try:
+                validate_csrf(
+                    request.headers.get("X-CSRFToken") or request.form.get("csrf_token")
+                )
+            except ValidationError:
+                return jsonify(
+                    error=_("Your session expired. Reload the page and try again.")
+                ), 400
+        return view(*args, **kwargs)
+
+    return wrapper
 
 
 @bp.route("/new_post/video", methods=["POST"])
 @login_required
+@csrf_protected_json
 def upload_video():
-    try:
-        _check_csrf()
-    except ValidationError:
-        return jsonify(
-            error=_("Your session expired. Reload the page and try again.")
-        ), 400
     file = request.files.get("video")
     token = videos.save_pending(current_user.id, file) if file else None
     if token is None:
@@ -127,20 +138,15 @@ def upload_video():
 
 @bp.route("/new_post/video/<token>", methods=["DELETE"])
 @login_required
+@csrf_protected_json
 def discard_video(token):
-    try:
-        _check_csrf()
-    except ValidationError:
-        return jsonify(
-            error=_("Your session expired. Reload the page and try again.")
-        ), 400
     videos.delete_pending(current_user.id, token)
     return "", 204
 
 
 @bp.app_errorhandler(413)
 def video_too_large(error):
-    if request.path == url_for("main.upload_video"):
+    if request.endpoint == "main.upload_video":
         return jsonify(error=_("That video is too large.")), 413
     return error
 

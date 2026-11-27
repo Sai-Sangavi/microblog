@@ -12,7 +12,10 @@
       <a href="{{ url_for('main.user', username=post.author.username) }}"><strong>{{ post.author.username }}</strong></a>
       <span class="text-muted text-sm">{{ moment(post.timestamp).fromNow() }}</span>
     </div>
-    <p class="post-body">{{ post.body }}</p>
+    {% if post.body %}<p class="post-body">{{ post.body }}</p>{% endif %}
+    {% if post.video_filename %}
+    <video controls preload="metadata" class="post-video" src="{{ url_for('main.post_video', filename=post.video_filename) }}"></video>
+    {% endif %}
   </article>
 
   <section aria-label="{{ _('Comments') }}" class="stack-lg" id="comments">

@@ -19,6 +19,10 @@
                 <br>
                 <span id="post{{ post.id }}">{{ post.body }}</span>
                 <br>
+                {% if post.video_filename %}
+                <video controls preload="metadata" class="post-video" src="{{ url_for('main.post_video', filename=post.video_filename) }}"></video>
+                <br>
+                {% endif %}
                 <a href="{{ url_for('main.post', id=post.id) }}#comments">{{ _('Comments') }}</a>
                 {% if post.language and post.language != g.locale %}
                 <br><br>

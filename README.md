@@ -8,3 +8,7 @@ The version of the application featured in this repository corresponds to the 20
 
 - `VIDEO_MAX_BYTES` — largest video a member can attach to a post, in bytes (default `524288000`, 500 MB). The proxy's body limit (for example nginx `client_max_body_size`) must allow slightly more than this.
 - `VIDEO_UPLOAD_DIR` — directory where uploaded videos are stored (default `uploads/` in the repository). In production it must be writable, durable and shared by all web instances.
+
+## Deployment notes
+
+- Restart the app after changing `config.py`.
